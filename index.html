@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pomodoro Timer</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --fg: #0f172a; /* slate-900 */
+      --accent: #0ea5e9; /* sky */
+      --muted: #94a3b8; /* slate-400 */
+    }
+
+    [data-theme="dark"] {
+      --bg: #020617; /* slate-950 */
+      --fg: #e5e7eb;
+      --accent: #38bdf8; /* sky-400 */
+      --muted: #64748b;
+    }
+
+    * {
+      box-sizing: border-box;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--fg);
+      display: grid;
+      place-items: center;
+    }
+
+    .card {
+      width: 340px;
+      padding: 24px 24px 28px;
+      border-radius: 24px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.02));
+      box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 1rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+
+    .timer-wrapper {
+      position: relative;
+      width: 240px;
+      height: 240px;
+      margin: 0 auto 20px;
+    }
+
+    svg {
+      transform: rotate(-90deg);
+    }
+
+    .time-text {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      font-size: 2.5rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+    }
+
+    .controls {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: none;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.15s ease, opacity 0.15s ease;
+    }
+
+    button.secondary {
+      background: transparent;
+      color: var(--fg);
+      border: 1px solid var(--muted);
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      opacity: 0.9;
+    }
+
+    .preset {
+      background: transparent;
+      color: var(--fg);
+      border: 1px solid var(--muted);
+    }
+
+    .preset.active {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 8px;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    input[type="number"] {
+      width: 60px;
+      border-radius: 8px;
+      border: 1px solid var(--muted);
+      background: transparent;
+      color: var(--fg);
+      padding: 4px 6px;
+    }
+  </style>
+</head>
+<body data-theme="light">
+  <div class="card">
+    <h1>Pomodoro</h1>
+
+    <div class="timer-wrapper">
+      <svg width="240" height="240">
+        <circle cx="120" cy="120" r="100" stroke="var(--muted)" stroke-width="12" fill="none" opacity="0.2" />
+        <circle id="progress" cx="120" cy="120" r="100" stroke="var(--accent)" stroke-width="12" fill="none"
+          stroke-linecap="round"
+          stroke-dasharray="628"
+          stroke-dashoffset="0" />
+      </svg>
+      <div class="time-text" id="time">10:00</div>
+    </div>
+
+    <div class="controls">
+      <button class="preset active" data-min="10">10 min</button>
+      <button class="preset" data-min="25">25 min</button>
+      <button class="preset" data-min="custom">Custom</button>
+    </div>
+
+    <div class="controls">
+      <button id="start">Start</button>
+      <button id="reset" class="secondary">Reset</button>
+    </div>
+
+    <div class="footer">
+      <div>
+        <input id="customMin" type="number" min="1" value="25" /> min
+      </div>
+      <button id="theme" class="secondary">Light / Dark</button>
+    </div>
+  </div>
+
+  <script>
+    const timeEl = document.getElementById('time');
+    const progressEl = document.getElementById('progress');
+    const presets = document.querySelectorAll('.preset');
+    const startBtn = document.getElementById('start');
+    const resetBtn = document.getElementById('reset');
+    const themeBtn = document.getElementById('theme');
+    const customMinEl = document.getElementById('customMin');
+
+    const circumference = 2 * Math.PI * 100;
+    progressEl.style.strokeDasharray = circumference;
+
+    let totalSeconds = 600;
+    let remaining = totalSeconds;
+    let timer = null;
+    let running = false;
+
+    function format(sec) {
+      const m = String(Math.floor(sec / 60)).padStart(2, '0');
+      const s = String(sec % 60).padStart(2, '0');
+      return `${m}:${s}`;
+    }
+
+    function updateUI() {
+      timeEl.textContent = format(remaining);
+      const offset = circumference * (1 - remaining / totalSeconds);
+      progressEl.style.strokeDashoffset = offset;
+    }
+
+    function setMinutes(min) {
+      totalSeconds = min * 60;
+      remaining = totalSeconds;
+      updateUI();
+    }
+
+    presets.forEach(btn => {
+      btn.addEventListener('click', () => {
+        presets.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        if (btn.dataset.min === 'custom') {
+          setMinutes(Number(customMinEl.value));
+        } else {
+          setMinutes(Number(btn.dataset.min));
+        }
+      });
+    });
+
+    startBtn.addEventListener('click', () => {
+      if (running) return;
+      running = true;
+      timer = setInterval(() => {
+        remaining--;
+        updateUI();
+        if (remaining <= 0) {
+          clearInterval(timer);
+          running = false;
+          alert('Time up!');
+        }
+      }, 1000);
+    });
+
+    resetBtn.addEventListener('click', () => {
+      clearInterval(timer);
+      running = false;
+      remaining = totalSeconds;
+      updateUI();
+    });
+
+    themeBtn.addEventListener('click', () => {
+      document.body.dataset.theme = document.body.dataset.theme === 'dark' ? 'light' : 'dark';
+    });
+
+    updateUI();
+  </script>
+</body>
+</html>
